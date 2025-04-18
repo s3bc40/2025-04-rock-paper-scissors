@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// @audit-info pragma not fixed
+// @audit-notes: search for known issues related to 0.8.13
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -10,11 +12,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @notice ERC20 token awarded to winners of Rock Paper Scissors games
  * @dev Can be used as entry fee for new games instead of ETH
  */
+// aderyn-ignore-next-line(centralization-risk)
 contract WinningToken is ERC20, ERC20Burnable, Ownable {
     /**
      * @dev Constructor initializes the token with name and symbol
      */
-    constructor() ERC20("Rock Paper Scissors Winner Token", "RPSW") Ownable(msg.sender) {
+    constructor()
+        ERC20("Rock Paper Scissors Winner Token", "RPSW")
+        Ownable(msg.sender)
+    {
         // No initial supply
     }
 

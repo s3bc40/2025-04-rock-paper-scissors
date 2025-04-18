@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// @audit-info pragma not fixed
+// @audit-notes: search for known issues related to 0.8.13
 pragma solidity ^0.8.13;
 
 import "./WinningToken.sol";
@@ -21,7 +23,7 @@ contract RockPaperScissors {
     enum GameState {
         Created,
         Committed,
-        Revealed,
+        Revealed, // @audit-note not used
         Finished,
         Cancelled
     }
@@ -30,15 +32,20 @@ contract RockPaperScissors {
     struct Game {
         address playerA; // Creator of the game
         address playerB; // Second player to join
+        // @answered bet is in ETH but we can join with token?
         uint256 bet; // Amount of ETH bet
+        // @audit-question is it not the same timeout or reveal deadline?
         uint256 timeoutInterval; // Time allowed for reveal phase
         uint256 revealDeadline; // Deadline for revealing moves
         uint256 creationTime; // When the game was created
+        // @audit-note default should be 24 hours
         uint256 joinDeadline; // Deadline for someone to join the game
+        // @audit-note should be odd
         uint256 totalTurns; // Total number of turns in the game
         uint256 currentTurn; // Current turn number
         bytes32 commitA; // Hashed move from player A
         bytes32 commitB; // Hashed move from player B
+        // @audit-note careful if stored or manipulated
         Move moveA; // Revealed move from player A
         Move moveB; // Revealed move from player B
         uint8 scoreA; // Score for player A
@@ -59,6 +66,7 @@ contract RockPaperScissors {
     address public adminAddress;
 
     // Deposit amounts and timeouts
+    // @audit-info constant should be in capital letters
     uint256 public constant minBet = 0.01 ether;
     uint256 public joinTimeout = 24 hours; // Time allowed for someone to join the game
 
@@ -69,11 +77,29 @@ contract RockPaperScissors {
     uint256 public accumulatedFees;
 
     // Events
-    event GameCreated(uint256 indexed gameId, address indexed creator, uint256 bet, uint256 totalTurns);
+    event GameCreated(
+        uint256 indexed gameId,
+        address indexed creator,
+        uint256 bet,
+        uint256 totalTurns
+    );
     event PlayerJoined(uint256 indexed gameId, address indexed player);
-    event MoveCommitted(uint256 indexed gameId, address indexed player, uint256 currentTurn);
-    event MoveRevealed(uint256 indexed gameId, address indexed player, Move move, uint256 currentTurn);
-    event TurnCompleted(uint256 indexed gameId, address winner, uint256 currentTurn);
+    event MoveCommitted(
+        uint256 indexed gameId,
+        address indexed player,
+        uint256 currentTurn
+    );
+    event MoveRevealed(
+        uint256 indexed gameId,
+        address indexed player,
+        Move move,
+        uint256 currentTurn
+    );
+    event TurnCompleted(
+        uint256 indexed gameId,
+        address winner,
+        uint256 currentTurn
+    );
     event GameFinished(uint256 indexed gameId, address winner, uint256 prize);
     event GameCancelled(uint256 indexed gameId);
     event JoinTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
@@ -93,11 +119,19 @@ contract RockPaperScissors {
      * @param _totalTurns Number of turns for the game (must be odd)
      * @param _timeoutInterval Seconds allowed for reveal phase
      */
-    function createGameWithEth(uint256 _totalTurns, uint256 _timeoutInterval) external payable returns (uint256) {
+    function createGameWithEth(
+        uint256 _totalTurns,
+        uint256 _timeoutInterval
+    ) external payable returns (uint256) {
+        // @audit-note follow CEI
         require(msg.value >= minBet, "Bet amount too small");
         require(_totalTurns > 0, "Must have at least one turn");
         require(_totalTurns % 2 == 1, "Total turns must be odd");
-        require(_timeoutInterval >= 5 minutes, "Timeout must be at least 5 minutes");
+        // @audit-info consider making a constant for min timeout
+        require(
+            _timeoutInterval >= 5 minutes,
+            "Timeout must be at least 5 minutes"
+        );
 
         uint256 gameId = gameCounter++;
 
@@ -106,6 +140,7 @@ contract RockPaperScissors {
         game.bet = msg.value;
         game.timeoutInterval = _timeoutInterval;
         game.creationTime = block.timestamp;
+        // @audit-note joinTimeout can be modified by admin and admin can create/join a game
         game.joinDeadline = block.timestamp + joinTimeout;
         game.totalTurns = _totalTurns;
         game.currentTurn = 1;
@@ -121,13 +156,25 @@ contract RockPaperScissors {
      * @param _totalTurns Number of turns for the game (must be odd)
      * @param _timeoutInterval Seconds allowed for reveal phase
      */
-    function createGameWithToken(uint256 _totalTurns, uint256 _timeoutInterval) external returns (uint256) {
-        require(winningToken.balanceOf(msg.sender) >= 1, "Must have winning token");
+    function createGameWithToken(
+        uint256 _totalTurns,
+        uint256 _timeoutInterval
+    ) external returns (uint256) {
+        require(
+            winningToken.balanceOf(msg.sender) >= 1,
+            "Must have winning token"
+        );
         require(_totalTurns > 0, "Must have at least one turn");
         require(_totalTurns % 2 == 1, "Total turns must be odd");
-        require(_timeoutInterval >= 5 minutes, "Timeout must be at least 5 minutes");
+        require(
+            _timeoutInterval >= 5 minutes,
+            "Timeout must be at least 5 minutes"
+        );
 
         // Transfer token to contract
+        // @audit-issue no CEI respected -> reentrancy
+        // potentially worst if it is possible to become admin from it
+        // @audit-issue no check on completion of the transfer
         winningToken.transferFrom(msg.sender, address(this), 1);
 
         uint256 gameId = gameCounter++;
@@ -137,6 +184,7 @@ contract RockPaperScissors {
         game.bet = 0; // Zero ether bet because using token
         game.timeoutInterval = _timeoutInterval;
         game.creationTime = block.timestamp;
+        // @audit-note joinTimeout can be modified by admin and admin can create a game
         game.joinDeadline = block.timestamp + joinTimeout;
         game.totalTurns = _totalTurns;
         game.currentTurn = 1;
@@ -174,9 +222,15 @@ contract RockPaperScissors {
         require(game.playerA != msg.sender, "Cannot join your own game");
         require(block.timestamp <= game.joinDeadline, "Join deadline passed");
         require(game.bet == 0, "This game requires ETH bet");
-        require(winningToken.balanceOf(msg.sender) >= 1, "Must have winning token");
+        require(
+            winningToken.balanceOf(msg.sender) >= 1,
+            "Must have winning token"
+        );
 
         // Transfer token to contract
+        // @audit-issue no CEI respected -> reentrancy
+        // potentially worst if it is possible to become admin from it
+        // @audit-issue no check on completion of the transfer
         winningToken.transferFrom(msg.sender, address(this), 1);
 
         game.playerB = msg.sender;
@@ -191,17 +245,32 @@ contract RockPaperScissors {
     function commitMove(uint256 _gameId, bytes32 _commitHash) external {
         Game storage game = games[_gameId];
 
-        require(msg.sender == game.playerA || msg.sender == game.playerB, "Not a player in this game");
-        require(game.state == GameState.Created || game.state == GameState.Committed, "Game not in commit phase");
+        require(
+            msg.sender == game.playerA || msg.sender == game.playerB,
+            "Not a player in this game"
+        );
+        // @audit-question GameState.Created? game should not be in commit phase?
+        require(
+            game.state == GameState.Created ||
+                game.state == GameState.Committed,
+            "Game not in commit phase"
+        );
 
-        if (game.currentTurn == 1 && game.commitA == bytes32(0) && game.commitB == bytes32(0)) {
+        if (
+            game.currentTurn == 1 &&
+            game.commitA == bytes32(0) &&
+            game.commitB == bytes32(0)
+        ) {
             // First turn, first commits
             require(game.playerB != address(0), "Waiting for player B to join");
             game.state = GameState.Committed;
         } else {
             // Later turns or second player committing
             require(game.state == GameState.Committed, "Not in commit phase");
-            require(game.moveA == Move.None && game.moveB == Move.None, "Moves already committed for this turn");
+            require(
+                game.moveA == Move.None && game.moveB == Move.None,
+                "Moves already committed for this turn"
+            );
         }
 
         if (msg.sender == game.playerA) {
@@ -217,6 +286,7 @@ contract RockPaperScissors {
         // If both players have committed, set the reveal deadline
         if (game.commitA != bytes32(0) && game.commitB != bytes32(0)) {
             game.revealDeadline = block.timestamp + game.timeoutInterval;
+            // @audit-issue change state to revealed here
         }
     }
 
@@ -229,9 +299,17 @@ contract RockPaperScissors {
     function revealMove(uint256 _gameId, uint8 _move, bytes32 _salt) external {
         Game storage game = games[_gameId];
 
-        require(msg.sender == game.playerA || msg.sender == game.playerB, "Not a player in this game");
+        require(
+            msg.sender == game.playerA || msg.sender == game.playerB,
+            "Not a player in this game"
+        );
+        // @audit-issue should be in reveal phase not in commited
+        // potentially revealing a move during a commit phase
         require(game.state == GameState.Committed, "Game not in reveal phase");
-        require(block.timestamp <= game.revealDeadline, "Reveal phase timed out");
+        require(
+            block.timestamp <= game.revealDeadline,
+            "Reveal phase timed out"
+        );
         require(_move >= 1 && _move <= 3, "Invalid move");
 
         Move move = Move(_move);
@@ -262,9 +340,15 @@ contract RockPaperScissors {
     function timeoutReveal(uint256 _gameId) external {
         Game storage game = games[_gameId];
 
-        require(msg.sender == game.playerA || msg.sender == game.playerB, "Not a player in this game");
+        require(
+            msg.sender == game.playerA || msg.sender == game.playerB,
+            "Not a player in this game"
+        );
         require(game.state == GameState.Committed, "Game not in reveal phase");
-        require(block.timestamp > game.revealDeadline, "Reveal phase not timed out yet");
+        require(
+            block.timestamp > game.revealDeadline,
+            "Reveal phase not timed out yet"
+        );
 
         // If player calling timeout has revealed but opponent hasn't, they win
         bool playerARevealed = game.moveA != Move.None;
@@ -273,7 +357,9 @@ contract RockPaperScissors {
         if (msg.sender == game.playerA && playerARevealed && !playerBRevealed) {
             // Player A wins by timeout
             _finishGame(_gameId, game.playerA);
-        } else if (msg.sender == game.playerB && playerBRevealed && !playerARevealed) {
+        } else if (
+            msg.sender == game.playerB && playerBRevealed && !playerARevealed
+        ) {
             // Player B wins by timeout
             _finishGame(_gameId, game.playerB);
         } else if (!playerARevealed && !playerBRevealed) {
@@ -290,10 +376,15 @@ contract RockPaperScissors {
      * @return canTimeout Whether the game can be timed out
      * @return winnerIfTimeout The address of the winner if timed out, or address(0) if tied
      */
-    function canTimeoutReveal(uint256 _gameId) external view returns (bool canTimeout, address winnerIfTimeout) {
+    function canTimeoutReveal(
+        uint256 _gameId
+    ) external view returns (bool canTimeout, address winnerIfTimeout) {
         Game storage game = games[_gameId];
 
-        if (game.state != GameState.Committed || block.timestamp <= game.revealDeadline) {
+        if (
+            game.state != GameState.Committed ||
+            block.timestamp <= game.revealDeadline
+        ) {
             return (false, address(0));
         }
 
@@ -318,7 +409,10 @@ contract RockPaperScissors {
     function cancelGame(uint256 _gameId) external {
         Game storage game = games[_gameId];
 
-        require(game.state == GameState.Created, "Game must be in created state");
+        require(
+            game.state == GameState.Created,
+            "Game must be in created state"
+        );
         require(msg.sender == game.playerA, "Only creator can cancel");
 
         _cancelGame(_gameId);
@@ -331,9 +425,18 @@ contract RockPaperScissors {
     function timeoutJoin(uint256 _gameId) external {
         Game storage game = games[_gameId];
 
-        require(game.state == GameState.Created, "Game must be in created state");
-        require(block.timestamp > game.joinDeadline, "Join deadline not reached yet");
-        require(game.playerB == address(0), "Someone has already joined the game");
+        require(
+            game.state == GameState.Created,
+            "Game must be in created state"
+        );
+        require(
+            block.timestamp > game.joinDeadline,
+            "Join deadline not reached yet"
+        );
+        require(
+            game.playerB == address(0),
+            "Someone has already joined the game"
+        );
 
         _cancelGame(_gameId);
     }
@@ -360,7 +463,9 @@ contract RockPaperScissors {
     function canTimeoutJoin(uint256 _gameId) external view returns (bool) {
         Game storage game = games[_gameId];
 
-        return (game.state == GameState.Created && block.timestamp > game.joinDeadline && game.playerB == address(0));
+        return (game.state == GameState.Created &&
+            block.timestamp > game.joinDeadline &&
+            game.playerB == address(0));
     }
 
     /**
@@ -375,6 +480,7 @@ contract RockPaperScissors {
      * @notice Get the owner of the token contract
      * @return The token owner address
      */
+    // @audit-info public function not used internally should be external
     function tokenOwner() public view returns (address) {
         return winningToken.owner();
     }
@@ -384,6 +490,9 @@ contract RockPaperScissors {
      * @param _newAdmin The new admin address
      */
     function setAdmin(address _newAdmin) external {
+        // @audit-info create a modifier for this
+        // @audit-info create solidity error for gas efficiency
+        // @audit-issue no event on admin change
         require(msg.sender == adminAddress, "Only admin can set new admin");
         require(_newAdmin != address(0), "Admin cannot be zero address");
 
@@ -398,11 +507,14 @@ contract RockPaperScissors {
         require(msg.sender == adminAddress, "Only admin can withdraw fees");
 
         uint256 amountToWithdraw = _amount == 0 ? accumulatedFees : _amount;
-        require(amountToWithdraw <= accumulatedFees, "Insufficient fee balance");
+        require(
+            amountToWithdraw <= accumulatedFees,
+            "Insufficient fee balance"
+        );
 
         accumulatedFees -= amountToWithdraw;
 
-        (bool success,) = adminAddress.call{value: amountToWithdraw}("");
+        (bool success, ) = adminAddress.call{value: amountToWithdraw}("");
         require(success, "Fee withdrawal failed");
 
         emit FeeWithdrawn(adminAddress, amountToWithdraw);
@@ -422,9 +534,9 @@ contract RockPaperScissors {
             // Tie, no points
             turnWinner = address(0);
         } else if (
-            (game.moveA == Move.Rock && game.moveB == Move.Scissors)
-                || (game.moveA == Move.Paper && game.moveB == Move.Rock)
-                || (game.moveA == Move.Scissors && game.moveB == Move.Paper)
+            (game.moveA == Move.Rock && game.moveB == Move.Scissors) ||
+            (game.moveA == Move.Paper && game.moveB == Move.Rock) ||
+            (game.moveA == Move.Scissors && game.moveB == Move.Paper)
         ) {
             // Player A wins
             game.scoreA++;
@@ -488,7 +600,8 @@ contract RockPaperScissors {
             emit FeeCollected(_gameId, fee);
 
             // Send prize to winner
-            (bool success,) = _winner.call{value: prize}("");
+            // @audit-issue reentrancy
+            (bool success, ) = _winner.call{value: prize}("");
             require(success, "Transfer failed");
         }
 
@@ -508,6 +621,8 @@ contract RockPaperScissors {
      * @dev Handle a tie
      * @param _gameId ID of the game
      */
+    // @audit-note function in case of tie but odd turns should not happen
+    // @audit-note maybe try to create a case where it can happen
     function _handleTie(uint256 _gameId) internal {
         Game storage game = games[_gameId];
 
@@ -517,6 +632,12 @@ contract RockPaperScissors {
         if (game.bet > 0) {
             // Calculate protocol fee (10% of total pot)
             uint256 totalPot = game.bet * 2;
+            // @audit-note 1ETH = 1e18 = 1_000_000_000_000_000_000
+            // totalPot = 2 * 1e18 = 2e18
+            // fee = 10% of 2ETH = 0.2ETH = 200_000_000_000_000_000 => 2e17
+            // refundPerPlayer = 900_000_000_000_000_000 => 0.9ETH
+            // @audit-note what happens if the bet is not even?
+
             uint256 fee = (totalPot * PROTOCOL_FEE_PERCENT) / 100;
             uint256 refundPerPlayer = (totalPot - fee) / 2;
 
@@ -525,8 +646,8 @@ contract RockPaperScissors {
             emit FeeCollected(_gameId, fee);
 
             // Refund both players
-            (bool successA,) = game.playerA.call{value: refundPerPlayer}("");
-            (bool successB,) = game.playerB.call{value: refundPerPlayer}("");
+            (bool successA, ) = game.playerA.call{value: refundPerPlayer}("");
+            (bool successB, ) = game.playerB.call{value: refundPerPlayer}("");
             require(successA && successB, "Transfer failed");
         }
 
@@ -537,6 +658,8 @@ contract RockPaperScissors {
         }
 
         // Since in a tie scenario, the total prize is split equally
+        // audit-issue disrupt the game make it a tie and revert on transfer with ETH game
+        // no event emitted and the game is not finished
         emit GameFinished(_gameId, address(0), 0);
     }
 
@@ -551,11 +674,11 @@ contract RockPaperScissors {
 
         // Refund ETH to players
         if (game.bet > 0) {
-            (bool successA,) = game.playerA.call{value: game.bet}("");
+            (bool successA, ) = game.playerA.call{value: game.bet}("");
             require(successA, "Transfer to player A failed");
 
             if (game.playerB != address(0)) {
-                (bool successB,) = game.playerB.call{value: game.bet}("");
+                (bool successB, ) = game.playerB.call{value: game.bet}("");
                 require(successB, "Transfer to player B failed");
             }
         }
