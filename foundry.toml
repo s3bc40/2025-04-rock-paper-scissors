@@ -6,10 +6,10 @@ solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
-verbosity = 3  # Display detailed logs
+verbosity = 3        # Display detailed logs
 
 [profile.ci]
-verbosity = 4  # Maximum logging
+verbosity = 4 # Maximum logging
 
 # For fuzzing tests
 [fuzz]

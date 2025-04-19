@@ -7,13 +7,29 @@ import "../src/WinningToken.sol";
 
 contract RockPaperScissorsTest is Test {
     // Events for testing
-    event GameCreated(uint256 indexed gameId, address indexed creator, uint256 bet, uint256 totalTurns);
-    event PlayerJoined(uint256 indexed gameId, address indexed player);
-    event MoveCommitted(uint256 indexed gameId, address indexed player, uint256 currentTurn);
-    event MoveRevealed(
-        uint256 indexed gameId, address indexed player, RockPaperScissors.Move move, uint256 currentTurn
+    event GameCreated(
+        uint256 indexed gameId,
+        address indexed creator,
+        uint256 bet,
+        uint256 totalTurns
     );
-    event TurnCompleted(uint256 indexed gameId, address winner, uint256 currentTurn);
+    event PlayerJoined(uint256 indexed gameId, address indexed player);
+    event MoveCommitted(
+        uint256 indexed gameId,
+        address indexed player,
+        uint256 currentTurn
+    );
+    event MoveRevealed(
+        uint256 indexed gameId,
+        address indexed player,
+        RockPaperScissors.Move move,
+        uint256 currentTurn
+    );
+    event TurnCompleted(
+        uint256 indexed gameId,
+        address winner,
+        uint256 currentTurn
+    );
     event GameFinished(uint256 indexed gameId, address winner, uint256 prize);
     event GameCancelled(uint256 indexed gameId);
     event JoinTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
@@ -70,7 +86,10 @@ contract RockPaperScissorsTest is Test {
         vm.expectEmit(true, true, false, true);
         emit GameCreated(0, playerA, BET_AMOUNT, TOTAL_TURNS);
 
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
         vm.stopPrank();
 
         // Verify game details
@@ -139,7 +158,24 @@ contract RockPaperScissorsTest is Test {
         assertEq(token.balanceOf(address(game)), 1);
 
         // Verify game details
-        (address storedPlayerA,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (
+            address storedPlayerA,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(storedPlayerA, playerA);
         assertEq(uint256(state), uint256(RockPaperScissors.GameState.Created));
@@ -151,7 +187,10 @@ contract RockPaperScissorsTest is Test {
     function testJoinGameWithEth() public {
         // First create a game
         vm.prank(playerA);
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         // Now join the game
         vm.startPrank(playerB);
@@ -162,8 +201,24 @@ contract RockPaperScissorsTest is Test {
         vm.stopPrank();
 
         // Verify game state
-        (address storedPlayerA, address storedPlayerB,,,,,,,,,,,,,, RockPaperScissors.GameState state) =
-            game.games(gameId);
+        (
+            address storedPlayerA,
+            address storedPlayerB,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(storedPlayerA, playerA);
         assertEq(storedPlayerB, playerB);
@@ -174,7 +229,10 @@ contract RockPaperScissorsTest is Test {
     function test_RevertWhen_JoinGameWithWrongBet() public {
         // First create a game
         vm.prank(playerA);
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         // Try to join with wrong bet amount
         vm.prank(playerB);
@@ -186,7 +244,10 @@ contract RockPaperScissorsTest is Test {
     function test_RevertWhen_JoinOwnGame() public {
         // First create a game
         vm.prank(playerA);
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         // Try to join own game
         vm.prank(playerA);
@@ -217,8 +278,24 @@ contract RockPaperScissorsTest is Test {
         assertEq(token.balanceOf(address(game)), 2);
 
         // Verify game state
-        (address storedPlayerA, address storedPlayerB,,,,,,,,,,,,,, RockPaperScissors.GameState state) =
-            game.games(gameId);
+        (
+            address storedPlayerA,
+            address storedPlayerB,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(storedPlayerA, playerA);
         assertEq(storedPlayerB, playerB);
@@ -230,7 +307,10 @@ contract RockPaperScissorsTest is Test {
     // Helper function to create and join a game
     function createAndJoinGame() internal returns (uint256) {
         vm.prank(playerA);
-        uint256 id = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        uint256 id = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         vm.prank(playerB);
         game.joinGameWithEth{value: BET_AMOUNT}(id);
@@ -244,7 +324,9 @@ contract RockPaperScissorsTest is Test {
 
         // Player A commits
         bytes32 saltA = keccak256(abi.encodePacked("salt for player A"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         vm.expectEmit(true, true, false, true);
@@ -253,7 +335,9 @@ contract RockPaperScissorsTest is Test {
 
         // Player B commits
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         vm.expectEmit(true, true, false, true);
@@ -261,12 +345,31 @@ contract RockPaperScissorsTest is Test {
         game.commitMove(gameId, commitB);
 
         // Verify game state
-        (,,,,,,,,, bytes32 storedCommitA, bytes32 storedCommitB,,,,, RockPaperScissors.GameState state) =
-            game.games(gameId);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bytes32 storedCommitA,
+            bytes32 storedCommitB,
+            ,
+            ,
+            ,
+            ,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(storedCommitA, commitA);
         assertEq(storedCommitB, commitB);
-        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Committed));
+        assertEq(
+            uint256(state),
+            uint256(RockPaperScissors.GameState.Committed)
+        );
     }
 
     // Test revealing moves
@@ -275,13 +378,17 @@ contract RockPaperScissorsTest is Test {
 
         // Commit moves
         bytes32 saltA = keccak256(abi.encodePacked("salt for player A"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         game.commitMove(gameId, commitA);
 
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -323,18 +430,29 @@ contract RockPaperScissorsTest is Test {
         assertEq(scoreA, 0);
         assertEq(scoreB, 1);
         assertEq(currentTurn, 2); // Advanced to turn 2
-        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Committed));
+        assertEq(
+            uint256(state),
+            uint256(RockPaperScissors.GameState.Committed)
+        );
     }
 
     // Helper function to play a single turn
-    function playTurn(uint256 _gameId, RockPaperScissors.Move moveA, RockPaperScissors.Move moveB) internal {
-        bytes32 saltA = keccak256(abi.encodePacked("salt for player A", _gameId, uint8(moveA)));
+    function playTurn(
+        uint256 _gameId,
+        RockPaperScissors.Move moveA,
+        RockPaperScissors.Move moveB
+    ) internal {
+        bytes32 saltA = keccak256(
+            abi.encodePacked("salt for player A", _gameId, uint8(moveA))
+        );
         bytes32 commitA = keccak256(abi.encodePacked(uint8(moveA), saltA));
 
         vm.prank(playerA);
         game.commitMove(_gameId, commitA);
 
-        bytes32 saltB = keccak256(abi.encodePacked("salt for player B", _gameId, uint8(moveB)));
+        bytes32 saltB = keccak256(
+            abi.encodePacked("salt for player B", _gameId, uint8(moveB))
+        );
         bytes32 commitB = keccak256(abi.encodePacked(uint8(moveB), saltB));
 
         vm.prank(playerB);
@@ -352,24 +470,37 @@ contract RockPaperScissorsTest is Test {
         gameId = createAndJoinGame();
 
         // First turn: A=Rock, B=Paper (B wins)
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Paper);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Paper
+        );
 
         // Second turn: A=Scissors, B=Rock (B wins)
-        playTurn(gameId, RockPaperScissors.Move.Scissors, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Scissors,
+            RockPaperScissors.Move.Rock
+        );
 
         // Third turn: A=Paper, B=Scissors (B wins)
         // This should end the game
         uint256 playerBBalanceBefore = playerB.balance;
 
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Scissors
+        );
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
         assertEq(uint256(state), uint256(RockPaperScissors.GameState.Finished));
 
         // Verify player B received prize
-        uint256 expectedPrize = (BET_AMOUNT * 2) * 90 / 100; // 10% fee
+        uint256 expectedPrize = ((BET_AMOUNT * 2) * 90) / 100; // 10% fee
         assertEq(playerB.balance - playerBBalanceBefore, expectedPrize);
 
         // Verify player B received a winner token
@@ -381,13 +512,23 @@ contract RockPaperScissorsTest is Test {
         gameId = createAndJoinGame();
 
         // First turn: A=Paper, B=Rock (A wins)
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
 
         // Second turn: A=Rock, B=Scissors (A wins)
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Scissors
+        );
 
         // Check state before final turn
-        (,,,,,,,,,,,,, uint8 scoreA, uint8 scoreB,) = game.games(gameId);
+        (, , , , , , , , , , , , , uint8 scoreA, uint8 scoreB, ) = game.games(
+            gameId
+        );
 
         assertEq(scoreA, 2);
         assertEq(scoreB, 0);
@@ -395,10 +536,14 @@ contract RockPaperScissorsTest is Test {
         // Third turn (doesn't matter who wins, A already has majority)
         uint256 playerABalanceBefore = playerA.balance;
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
 
         // Verify player A received prize
-        uint256 expectedPrize = (BET_AMOUNT * 2) * 90 / 100; // 10% fee
+        uint256 expectedPrize = ((BET_AMOUNT * 2) * 90) / 100; // 10% fee
         assertEq(playerA.balance - playerABalanceBefore, expectedPrize);
     }
 
@@ -408,7 +553,10 @@ contract RockPaperScissorsTest is Test {
     function testTimeoutJoin() public {
         // Create a game
         vm.prank(playerA);
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         // Fast forward past join deadline
         vm.warp(block.timestamp + game.joinTimeout() + 1);
@@ -424,9 +572,13 @@ contract RockPaperScissorsTest is Test {
         game.timeoutJoin(gameId);
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
-        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Cancelled));
+        assertEq(
+            uint256(state),
+            uint256(RockPaperScissors.GameState.Cancelled)
+        );
 
         // Verify refund
         uint256 contractBalance = address(game).balance;
@@ -439,14 +591,18 @@ contract RockPaperScissorsTest is Test {
 
         // Player A commits
         bytes32 saltA = keccak256(abi.encodePacked("salt for player A"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         game.commitMove(gameId, commitA);
 
         // Player B commits
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -459,7 +615,9 @@ contract RockPaperScissorsTest is Test {
         vm.warp(block.timestamp + TIMEOUT + 1);
 
         // Check if can timeout
-        (bool canTimeout, address winnerIfTimeout) = game.canTimeoutReveal(gameId);
+        (bool canTimeout, address winnerIfTimeout) = game.canTimeoutReveal(
+            gameId
+        );
         assertTrue(canTimeout);
         assertEq(winnerIfTimeout, playerA);
 
@@ -470,12 +628,13 @@ contract RockPaperScissorsTest is Test {
         game.timeoutReveal(gameId);
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
         assertEq(uint256(state), uint256(RockPaperScissors.GameState.Finished));
 
         // Verify player A received prize
-        uint256 expectedPrize = (BET_AMOUNT * 2) * 90 / 100; // 10% fee
+        uint256 expectedPrize = ((BET_AMOUNT * 2) * 90) / 100; // 10% fee
         assertEq(playerA.balance - playerABalanceBefore, expectedPrize);
     }
 
@@ -485,13 +644,17 @@ contract RockPaperScissorsTest is Test {
 
         // Both players commit
         bytes32 saltA = keccak256(abi.encodePacked("salt for player A"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         game.commitMove(gameId, commitA);
 
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -502,7 +665,9 @@ contract RockPaperScissorsTest is Test {
         vm.warp(block.timestamp + TIMEOUT + 1);
 
         // Check if can timeout
-        (bool canTimeout, address winnerIfTimeout) = game.canTimeoutReveal(gameId);
+        (bool canTimeout, address winnerIfTimeout) = game.canTimeoutReveal(
+            gameId
+        );
         assertTrue(canTimeout);
         assertEq(winnerIfTimeout, address(0)); // No winner
 
@@ -514,9 +679,13 @@ contract RockPaperScissorsTest is Test {
         game.timeoutReveal(gameId);
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
-        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Cancelled));
+        assertEq(
+            uint256(state),
+            uint256(RockPaperScissors.GameState.Cancelled)
+        );
 
         // Verify both players received refunds
         assertEq(playerA.balance - playerABalanceBefore, BET_AMOUNT);
@@ -570,11 +739,23 @@ contract RockPaperScissorsTest is Test {
         gameId = createAndJoinGame();
 
         // Play a full game to generate fees
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Scissors
+        );
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
 
         // Calculate expected fees
         uint256 totalBet = BET_AMOUNT * 2;
@@ -602,11 +783,23 @@ contract RockPaperScissorsTest is Test {
         gameId = createAndJoinGame();
 
         // Play a full game to generate fees
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Scissors
+        );
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
 
         // Calculate expected fees
         uint256 totalBet = BET_AMOUNT * 2;
@@ -654,18 +847,47 @@ contract RockPaperScissorsTest is Test {
         gameId = createAndJoinTokenGame();
 
         // First turn: A=Paper, B=Rock (A wins)
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
 
         // Second turn: A=Rock, B=Scissors (A wins)
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Scissors
+        );
 
         // Third turn: A=Paper, B=Scissors (B wins, but A still has more points)
         uint256 tokenBalanceABefore = token.balanceOf(playerA);
 
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Scissors);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Scissors
+        );
 
         // Verify game state
-        (,,,,,,,,,,,,, uint8 scoreA, uint8 scoreB, RockPaperScissors.GameState state) = game.games(gameId);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint8 scoreA,
+            uint8 scoreB,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(scoreA, 2);
         assertEq(scoreB, 1);
@@ -681,7 +903,10 @@ contract RockPaperScissorsTest is Test {
     function testCancelGame() public {
         // Create a game
         vm.prank(playerA);
-        gameId = game.createGameWithEth{value: BET_AMOUNT}(TOTAL_TURNS, TIMEOUT);
+        gameId = game.createGameWithEth{value: BET_AMOUNT}(
+            TOTAL_TURNS,
+            TIMEOUT
+        );
 
         // Cancel the game
         vm.prank(playerA);
@@ -691,9 +916,13 @@ contract RockPaperScissorsTest is Test {
         game.cancelGame(gameId);
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
-        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Cancelled));
+        assertEq(
+            uint256(state),
+            uint256(RockPaperScissors.GameState.Cancelled)
+        );
     }
 
     // Test can't cancel game after someone joined
@@ -717,10 +946,31 @@ contract RockPaperScissorsTest is Test {
         uint256 playerABalanceBefore = playerA.balance;
         uint256 playerBBalanceBefore = playerB.balance;
 
-        playTurn(gameId, RockPaperScissors.Move.Rock, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
 
         // Verify game state
-        (,,,,,,,,,,,,, uint8 scoreA, uint8 scoreB, RockPaperScissors.GameState state) = game.games(gameId);
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint8 scoreA,
+            uint8 scoreB,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
 
         assertEq(scoreA, 0);
         assertEq(scoreB, 0);
@@ -750,14 +1000,18 @@ contract RockPaperScissorsTest is Test {
 
         // Player A commits
         bytes32 saltA = keccak256(abi.encodePacked("salt for player A"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         game.commitMove(gameId, commitA);
 
         // Player B commits
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -785,7 +1039,9 @@ contract RockPaperScissorsTest is Test {
 
         // Player B commits
         bytes32 saltB = keccak256(abi.encodePacked("salt for player B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -809,17 +1065,25 @@ contract RockPaperScissorsTest is Test {
         game.joinGameWithEth{value: BET_AMOUNT}(gameId);
 
         // First turn completes normally
-        playTurn(gameId, RockPaperScissors.Move.Paper, RockPaperScissors.Move.Rock);
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
 
         // Second turn - player A commits and reveals, player B only commits
         bytes32 saltA = keccak256(abi.encodePacked("salt for turn 2"));
-        bytes32 commitA = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA));
+        bytes32 commitA = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Rock), saltA)
+        );
 
         vm.prank(playerA);
         game.commitMove(gameId, commitA);
 
         bytes32 saltB = keccak256(abi.encodePacked("salt for turn 2 B"));
-        bytes32 commitB = keccak256(abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB));
+        bytes32 commitB = keccak256(
+            abi.encodePacked(uint8(RockPaperScissors.Move.Paper), saltB)
+        );
 
         vm.prank(playerB);
         game.commitMove(gameId, commitB);
@@ -838,19 +1102,20 @@ contract RockPaperScissorsTest is Test {
         game.timeoutReveal(gameId);
 
         // Verify game state
-        (,,,,,,,,,,,,,,, RockPaperScissors.GameState state) = game.games(gameId);
+        (, , , , , , , , , , , , , , , RockPaperScissors.GameState state) = game
+            .games(gameId);
 
         assertEq(uint256(state), uint256(RockPaperScissors.GameState.Finished));
 
         // Verify player A received prize
-        uint256 expectedPrize = (BET_AMOUNT * 2) * 90 / 100; // 10% fee
+        uint256 expectedPrize = ((BET_AMOUNT * 2) * 90) / 100; // 10% fee
         assertEq(playerA.balance - playerABalanceBefore, expectedPrize);
     }
 
     // Test fallback function ability to receive ETH
     function testReceiveEth() public {
         // Send ETH directly to contract
-        (bool success,) = address(game).call{value: 1 ether}("");
+        (bool success, ) = address(game).call{value: 1 ether}("");
         assertTrue(success);
 
         // Verify contract balance increased
@@ -872,4 +1137,8 @@ contract RockPaperScissorsTest is Test {
     receive() external payable {
         // Allow the test contract to receive ETH
     }
+
+    // @audit-wip make tests to check:
+    // - gas differences after a lot of games creation and check revealMove cost
+    // - fee calculation for tie games (also normal games) -> fuzzing
 }

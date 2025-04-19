@@ -600,7 +600,6 @@ contract RockPaperScissors {
             emit FeeCollected(_gameId, fee);
 
             // Send prize to winner
-            // @audit-issue reentrancy
             (bool success, ) = _winner.call{value: prize}("");
             require(success, "Transfer failed");
         }
