@@ -286,7 +286,7 @@ contract RockPaperScissors {
         // If both players have committed, set the reveal deadline
         if (game.commitA != bytes32(0) && game.commitB != bytes32(0)) {
             game.revealDeadline = block.timestamp + game.timeoutInterval;
-            // @audit-issue change state to revealed here
+            // @audit-review maybe not here
         }
     }
 
