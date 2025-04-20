@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import "../src/RockPaperScissors.sol";
 import "../src/WinningToken.sol";
 
@@ -1141,4 +1141,116 @@ contract RockPaperScissorsTest is Test {
     // @audit-wip make tests to check:
     // - gas differences after a lot of games creation and check revealMove cost
     // - fee calculation for tie games (also normal games) -> fuzzing
+
+    // Test handling a tie game
+    function testAuditTieGameFeeCalculation(uint256 betAmount) public {
+        // Fund the players
+        vm.deal(playerA, 1000 ether);
+        vm.deal(playerB, 1000 ether);
+
+        betAmount = bound(betAmount, BET_AMOUNT, 1000 ether);
+        // Change to 1 turn to make a tie easier to create
+        vm.prank(playerA);
+        gameId = game.createGameWithEth{value: betAmount}(1, TIMEOUT);
+
+        vm.prank(playerB);
+        game.joinGameWithEth{value: betAmount}(gameId);
+
+        // Both players play Rock (creates a tie)
+        uint256 playerABalanceBefore = playerA.balance;
+        uint256 playerBBalanceBefore = playerB.balance;
+
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
+
+        // Verify game state
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            uint8 scoreA,
+            uint8 scoreB,
+            RockPaperScissors.GameState state
+        ) = game.games(gameId);
+
+        assertEq(scoreA, 0);
+        assertEq(scoreB, 0);
+        assertEq(uint256(state), uint256(RockPaperScissors.GameState.Finished));
+
+        // Verify both players received half of pot minus fees
+        uint256 totalPot = betAmount * 2;
+        uint256 fee = (totalPot * 10) / 100;
+        uint256 refundPerPlayer = (totalPot - fee) / 2;
+
+        assertEq(playerA.balance - playerABalanceBefore, refundPerPlayer);
+        assertEq(playerB.balance - playerBBalanceBefore, refundPerPlayer);
+        assertEq((refundPerPlayer * 2) + fee, totalPot); // Check total pot
+    }
+
+    // Test a game with player A winning
+    function testAuditCompleteGamePlayerAWinsFeesCalculation(
+        uint256 betAmount
+    ) public {
+        // Fund the players
+        vm.deal(playerA, 1000 ether);
+        vm.deal(playerB, 1000 ether);
+
+        betAmount = bound(betAmount, BET_AMOUNT, 1000 ether);
+        // Change to 1 turn to make a tie easier to create
+        vm.prank(playerA);
+        gameId = game.createGameWithEth{value: betAmount}(TOTAL_TURNS, TIMEOUT);
+
+        vm.prank(playerB);
+        game.joinGameWithEth{value: betAmount}(gameId);
+
+        // First turn: A=Paper, B=Rock (A wins)
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Paper,
+            RockPaperScissors.Move.Rock
+        );
+
+        // Second turn: A=Rock, B=Scissors (A wins)
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Scissors
+        );
+
+        // Check state before final turn
+        (, , , , , , , , , , , , , uint8 scoreA, uint8 scoreB, ) = game.games(
+            gameId
+        );
+
+        assertEq(scoreA, 2);
+        assertEq(scoreB, 0);
+
+        uint256 playerABalanceBefore = playerA.balance;
+
+        playTurn(
+            gameId,
+            RockPaperScissors.Move.Rock,
+            RockPaperScissors.Move.Rock
+        );
+
+        uint256 expectedPrize = ((betAmount * 2) * 90) / 100; // 10% fee
+        // @audit-issue this is working if ETH decimals precision is taken into account
+        // uint256 fees = (((betAmount * 2) * 10 * 1e18) / 100) / 1e18; // 10% fee
+        // uint256 totalPot = betAmount * 2;
+        // uint256 expectedPrize = totalPot - fees; // 90% of the pot minus fees
+        assertEq(playerA.balance - playerABalanceBefore, expectedPrize);
+    }
 }

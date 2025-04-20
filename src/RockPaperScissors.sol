@@ -591,8 +591,12 @@ contract RockPaperScissors {
         // Handle ETH prizes
         if (game.bet > 0) {
             // Calculate total pot and fee
+            // @audit-issue take into account decimals precision of ETH -> 1e18
             uint256 totalPot = game.bet * 2;
             uint256 fee = (totalPot * PROTOCOL_FEE_PERCENT) / 100;
+            // @audit-issue taking ETH decimals precision make it works and avoid dust for fees
+            // uint256 fee = ((totalPot * PROTOCOL_FEE_PERCENT * 1e18) / 100) /
+            //     1e18;
             prize = totalPot - fee;
 
             // Accumulate fees for admin to withdraw later
