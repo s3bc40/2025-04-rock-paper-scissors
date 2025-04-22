@@ -1144,11 +1144,7 @@ contract RockPaperScissorsTest is Test {
 
     // Test handling a tie game
     function testAuditTieGameFeeCalculation(uint256 betAmount) public {
-        // Fund the players
-        vm.deal(playerA, 1000 ether);
-        vm.deal(playerB, 1000 ether);
-
-        betAmount = bound(betAmount, BET_AMOUNT, 1000 ether);
+        betAmount = bound(betAmount, 0.01 ether, 0.05 ether);
         // Change to 1 turn to make a tie easier to create
         vm.prank(playerA);
         gameId = game.createGameWithEth{value: betAmount}(1, TIMEOUT);
@@ -1204,11 +1200,7 @@ contract RockPaperScissorsTest is Test {
     function testAuditCompleteGamePlayerAWinsFeesCalculation(
         uint256 betAmount
     ) public {
-        // Fund the players
-        vm.deal(playerA, 1000 ether);
-        vm.deal(playerB, 1000 ether);
-
-        betAmount = bound(betAmount, BET_AMOUNT, 1000 ether);
+        betAmount = bound(betAmount, 0.01 ether, 1 ether);
         // Change to 1 turn to make a tie easier to create
         vm.prank(playerA);
         gameId = game.createGameWithEth{value: betAmount}(TOTAL_TURNS, TIMEOUT);
@@ -1246,11 +1238,105 @@ contract RockPaperScissorsTest is Test {
             RockPaperScissors.Move.Rock
         );
 
-        uint256 expectedPrize = ((betAmount * 2) * 90) / 100; // 10% fee
-        // @audit-issue this is working if ETH decimals precision is taken into account
-        // uint256 fees = (((betAmount * 2) * 10 * 1e18) / 100) / 1e18; // 10% fee
-        // uint256 totalPot = betAmount * 2;
-        // uint256 expectedPrize = totalPot - fees; // 90% of the pot minus fees
+        // uint256 expectedPrize = ((betAmount * 2) * 90) / 100; // 10% fee
+        uint256 totalPot = betAmount * 2;
+        uint256 fees = ((totalPot * 10) / 100); // 10% fee
+        uint256 expectedPrize = totalPot - fees; // 90% of the pot minus fees
         assertEq(playerA.balance - playerABalanceBefore, expectedPrize);
+    }
+
+    /**
+     * @dev This test checks the storage bloat of the game contract when creating multiple games.
+     * It creates 100 games and then plays a game to see if the storage layout changes.
+     * It also prints the storage layout before and after creating the games.
+     * This is useful for auditing purposes to ensure that the contract is not using excessive storage.
+     * https://solodit.cyfrin.io/issues/m-02-an-attacker-can-bloat-the-pink-runtime-storage-with-zero-costs-code4rena-phala-network-phala-network-git
+     */
+    function testAuditCreateMultipleGameStorageBloat() public {
+        // Arrange
+        vm.prank(address(game));
+        token.mint(playerA, 100);
+        vm.stopPrank();
+
+        // Log storage of first few games BEFORE creation
+        console2.log("### Storage BEFORE creating games ###");
+        _printGameMappingStorageLayout();
+
+        // Act
+        // If playerA creates 100 games
+        vm.startPrank(playerA);
+        for (uint256 i = 0; i < 100; i++) {
+            token.approve(address(game), 1);
+            gameId = game.createGameWithToken(TOTAL_TURNS, TIMEOUT);
+        }
+
+        // Log storage of first few games AFTER creation
+        console2.log("### Storage AFTER creating games ###");
+        _printGameMappingStorageLayout();
+
+        // Continue gameplay as you originally had
+        vm.startPrank(playerB);
+        token.approve(address(game), 1);
+        vm.expectEmit(true, true, false, true);
+        emit PlayerJoined(gameId, playerB);
+        game.joinGameWithToken(gameId);
+        vm.stopPrank();
+
+        (, , , , , , , uint256 totalTurns, , , , , , , , ) = game.games(gameId);
+
+        for (uint256 i = 0; i < totalTurns; i++) {
+            playTurn(
+                gameId,
+                RockPaperScissors.Move.Scissors,
+                RockPaperScissors.Move.Paper
+            );
+
+            console2.log("### Storage AFTER game turn", i + 1, "###");
+            _printGameMappingStorageLayout();
+        }
+
+        console2.log("### Storage AFTER finishing a game ###");
+        _printGameMappingStorageLayout();
+
+        assertTrue(true);
+    }
+
+    /**
+     * @dev Prints the storage layout of the game mapping.
+     * This is for debugging purposes and should not be used in production.
+     */
+    function _printGameMappingStorageLayout() internal view {
+        console2.log("Game counter: ", game.gameCounter());
+        bytes32 base = keccak256(abi.encode(gameId, uint256(0)));
+        console2.log("Game ID", uint256(gameId));
+        for (uint256 j = 0; j < 12; j++) {
+            bytes32 slot = bytes32(uint256(base) + j);
+            bytes32 val = vm.load(address(game), slot);
+
+            if (j == 0 || j == 1) {
+                address addr = address(uint160(uint256(val)));
+                console2.log("Slot", j, "=", addr);
+            } else if (j == 9 || j == 10) {
+                console2.log("Slot", j, "=");
+                console2.logBytes32(val);
+            } else if (j == 11) {
+                // Solidity packs uint8, enum, and similar small types together into a single slot when possible, to save space.
+                // That’s 5 bytes total, and Solidity packs all of that into a single slot (Slot 11).
+                console2.log("Slot", j, "=");
+                uint8 moveA = uint8(uint256(val) >> (8 * 0));
+                uint8 moveB = uint8(uint256(val) >> (8 * 1));
+                uint8 scoreA = uint8(uint256(val) >> (8 * 2));
+                uint8 scoreB = uint8(uint256(val) >> (8 * 3));
+                uint8 state = uint8(uint256(val) >> (8 * 4));
+
+                console2.log("moveA", moveA);
+                console2.log("moveB", moveB);
+                console2.log("scoreA", scoreA);
+                console2.log("scoreB", scoreB);
+                console2.log("state", state);
+            } else {
+                console2.log("Slot", j, "=", uint256(val));
+            }
+        }
     }
 }

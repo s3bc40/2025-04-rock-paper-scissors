@@ -23,7 +23,7 @@ contract RockPaperScissors {
     enum GameState {
         Created,
         Committed,
-        Revealed, // @audit-note not used
+        Revealed, // // @reported not used
         Finished,
         Cancelled
     }
@@ -119,6 +119,7 @@ contract RockPaperScissors {
      * @param _totalTurns Number of turns for the game (must be odd)
      * @param _timeoutInterval Seconds allowed for reveal phase
      */
+    // @reported storage bloat since no limit on the number of games + struct 11 fields
     function createGameWithEth(
         uint256 _totalTurns,
         uint256 _timeoutInterval
@@ -172,7 +173,7 @@ contract RockPaperScissors {
         );
 
         // Transfer token to contract
-        // @audit-issue no CEI respected -> reentrancy
+        // @reported no CEI respected -> reentrancy
         // potentially worst if it is possible to become admin from it
         // @audit-issue no check on completion of the transfer
         winningToken.transferFrom(msg.sender, address(this), 1);
@@ -228,7 +229,7 @@ contract RockPaperScissors {
         );
 
         // Transfer token to contract
-        // @audit-issue no CEI respected -> reentrancy
+        // @reported no CEI respected -> reentrancy
         // potentially worst if it is possible to become admin from it
         // @audit-issue no check on completion of the transfer
         winningToken.transferFrom(msg.sender, address(this), 1);
@@ -303,7 +304,7 @@ contract RockPaperScissors {
             msg.sender == game.playerA || msg.sender == game.playerB,
             "Not a player in this game"
         );
-        // @audit-issue should be in reveal phase not in commited
+        // @reported should be in reveal phase not in commited
         // potentially revealing a move during a commit phase
         require(game.state == GameState.Committed, "Game not in reveal phase");
         require(
@@ -591,10 +592,10 @@ contract RockPaperScissors {
         // Handle ETH prizes
         if (game.bet > 0) {
             // Calculate total pot and fee
-            // @audit-issue take into account decimals precision of ETH -> 1e18
+            // @reported take into account decimals precision of ETH -> 1e18
             uint256 totalPot = game.bet * 2;
             uint256 fee = (totalPot * PROTOCOL_FEE_PERCENT) / 100;
-            // @audit-issue taking ETH decimals precision make it works and avoid dust for fees
+            // @reported taking ETH decimals precision make it works and avoid dust for fees
             // uint256 fee = ((totalPot * PROTOCOL_FEE_PERCENT * 1e18) / 100) /
             //     1e18;
             prize = totalPot - fee;
@@ -661,8 +662,6 @@ contract RockPaperScissors {
         }
 
         // Since in a tie scenario, the total prize is split equally
-        // audit-issue disrupt the game make it a tie and revert on transfer with ETH game
-        // no event emitted and the game is not finished
         emit GameFinished(_gameId, address(0), 0);
     }
 
